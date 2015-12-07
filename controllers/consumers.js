@@ -6,6 +6,8 @@ var kafka = require('kafka-node'),
     compression = config.kafka.compression || 0,
     logger = require('../logger'),
 
+    topics = require('../lib/topics'),
+
     getConsumerId = function (group, instanceId) {
         return group + '/' + instanceId;
     },
@@ -66,17 +68,23 @@ module.exports = function (app) {
 
         if (consumer.topics.indexOf(topic) == -1) {
 
-            if (!consumer.instance) {
-                createConsumerInstance(consumer, topic);
-            }
-            else {
-                //TODO: support adding topics
-            }
-            consumer.topics.push(req.params.topic);
+            topics.exists(topic, function (err, data) {
+                if (err) {
+                    return res.json({ error: 'Could not find topic ' + topic });
+                }
 
-            setTimeout(function () {
-                res.json([]);
-            }, 1000);
+                if (!consumer.instance) {
+                    createConsumerInstance(consumer, topic);
+                }
+                else {
+                    //TODO: support adding topics
+                }
+                consumer.topics.push(req.params.topic);
+
+                setTimeout(function () {
+                    res.json([]);
+                }, 1000);
+            });
         }
         else {
             var messages = consumer.messages.splice(0, consumer.messages.length);
