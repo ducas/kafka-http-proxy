@@ -11,7 +11,7 @@ var kafka = require('kafka-node'),
     refreshTopic = function (topic, cb) {
         client.topicExists([topic], function (err, data) {
             if (err) {
-                logger.error({error: err, request: req, response: res});
+                logger.error({ error: err });
                 return cb(err);
             }
             client.refreshMetadata([topic],  function (err, data) {

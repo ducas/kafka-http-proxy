@@ -11,7 +11,8 @@ var express = require('express'),
 app.use(morgan('combined', { stream: accessLogStream }));
 
 app.use(function(req, res, next) {
-    logger.debug({req: req, res: res}, config.logging.logName + ' Info Messages');
+    logger.debug({ url: req.originalUrl, method: req.method }, 'Received request.');
+    logger.trace({ req: req, res: res });
     next();
 });
 
