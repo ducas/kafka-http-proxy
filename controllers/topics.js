@@ -29,9 +29,9 @@ module.exports = function (app) {
     });
 
     app.post('/topics/:topic', function (req, res) {
-        logger.trace('posting information to topic');
 
         var topic = req.params.topic;
+        logger.trace({topic:topic}, 'controllers/topics : received post to topic');
 
         topics.partitions(topic, function (err, data) {
             if (err) {
@@ -40,12 +40,17 @@ module.exports = function (app) {
             }
 
             var numPartitions = data,
-                messages = req.body.records.map(function (p) {
+                payloads = [];
+
+            logger.trace({records: req.body.records.length}, 'controllers/topics : mapping records.');
+            req.body
+                .records
+                .forEach(function (p) {
                     var hasKey = p.key !== null && typeof p.key !== 'undefined',
                         hasPartition = p.partition !== null && typeof p.partition !== 'undefined',
                         result = {
                             topic: topic,
-                            messages: hasKey ? new kafka.KeyedMessage(p.key, p.value) : p.value,
+                            messages: [ hasKey ? new kafka.KeyedMessage(p.key, p.value) : p.value ],
                         };
                     if (hasKey) {
                         result.partition = murmur.murmur2(p.key, seed) % numPartitions;
@@ -53,19 +58,29 @@ module.exports = function (app) {
                     else if (hasPartition) {
                         result.partition = p.partition;
                     }
-                    return result;
+
+                    var existing = payloads.find(function (m) {
+                        return m.partition == result.partition;
+                    });
+                    if (existing) {
+                        return existing.messages.push(result.messages[0]);
+                    }
+                    payloads.push(result);
                 });
 
-            producer.send(messages, function (err, data) {
+            logger.trace({payloads: payloads.length}, 'controllers/topics : producing messages...');
+            producer.send(payloads, function (err, data) {
                 if (err) {
-                    logger.error({error: err, request: req, response: res});
+                    logger.error({error: err, request: req, response: res}, 'controllers/topics : error producing messages');
                     return res.status(500).json({error: err});
                 }
+
                 var topicResult = data[topic];
                 var results = [];
                 for (var i in topicResult) {
                     results.push({ partition: i, offset: topicResult[i] });
                 }
+                logger.trace({results: results.length}, 'controllers/topics : produced messages');
                 res.json({ offsets: results });
             });
         });
